@@ -1,0 +1,5 @@
+node_modules/
+.env
+matched_jobs.csv
+job_history.json
+cv.txt

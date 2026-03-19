@@ -1,0 +1,16 @@
+{
+  "name": "job-scraping",
+  "version": "1.0.0",
+  "description": "Zero-UI automated job-hunting pipeline: reads CV, fetches jobs, evaluates fit with AI, exports matches to CSV.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": ["job-scraping", "ai", "openai", "csv", "automation"],
+  "license": "MIT",
+  "dependencies": {
+    "csv-writer": "^1.6.0",
+    "dotenv": "^16.4.7"
+  }
+}
