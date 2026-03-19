@@ -1,0 +1,36 @@
+# Your Name
+City, Country | your@email.com | +XX XXXXXXXXX | LinkedIn URL
+
+## PROFILE
+Write 1–2 sentences summarising your professional background, core skills, and what kind of role you're targeting.
+
+## TECHNICAL SKILLS
+* **Category (e.g. Frontend):** Skill 1, Skill 2, Skill 3
+* **Category (e.g. Backend):** Skill 1, Skill 2, Skill 3
+* **Tools:** Tool 1, Tool 2, Tool 3
+
+## PROFESSIONAL EXPERIENCE
+
+### Company Name
+**Job Title** | Month Year - Month Year (or Present)
+* Bullet point describing a key achievement or responsibility.
+* Use specific numbers where possible (e.g. "reduced load time by 40%").
+* Keep each bullet to 1–2 lines.
+
+### Previous Company
+**Job Title** | Month Year - Month Year
+* Key achievement or responsibility.
+* Key achievement or responsibility.
+
+## EDUCATION
+
+### University / Institution Name
+**Degree Name** | Year - Year
+* Relevant coursework, thesis, or notable achievement (optional).
+
+## LANGUAGES
+* Language 1: Native
+* Language 2: Professional working proficiency (B2/C1)
+
+## CERTIFICATIONS (optional)
+* Certification Name — Issuing Organisation, Year
