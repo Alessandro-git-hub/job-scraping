@@ -3,3 +3,5 @@ node_modules/
 matched_jobs.csv
 job_history.json
 cv.txt
+profile.json
+.DS_Store
