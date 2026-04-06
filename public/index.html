@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Application Queue</title>
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent: #4f46e5;
+      --accent-hover: #4338ca;
+      --success: #059669;
+      --danger: #dc2626;
+      --radius: 8px;
+      --sidebar-width: 300px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      gap: 16px;
+    }
+
+    .header-left h1 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .header-left .subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .progress-track {
+      display: flex;
+      gap: 3px;
+      align-items: center;
+    }
+
+    .progress-pip {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 0.2s;
+      cursor: default;
+    }
+
+    .progress-pip.applied  { background: #10b981; }
+    .progress-pip.skipped  { background: #94a3b8; }
+    .progress-pip.active   { background: var(--accent); box-shadow: 0 0 0 2px #c7d2fe; }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-width);
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-toolbar {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sidebar-toolbar label {
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .sidebar-toolbar .spacer { flex: 1; }
+
+    .sidebar-toolbar .sel-count {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    #jobs-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+    }
+
+    /* ── Job card (sidebar) ─────────────────────────────────── */
+    .job-card {
+      padding: 10px 10px 10px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      transition: background 0.1s, border-color 0.1s;
+    }
+
+    .job-card:hover                       { background: var(--surface-2); }
+    .job-card.active                      { background: #ede9fe; border-color: #c4b5fd; }
+    .job-card.applied                     { opacity: 0.55; }
+    .job-card.skipped                     { opacity: 0.4; }
+
+    .job-card input[type=checkbox] {
+      margin-top: 2px;
+      flex-shrink: 0;
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+
+    .card-body        { flex: 1; min-width: 0; }
+    .card-title       { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-company     { font-size: 11px; color: var(--text-muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-badges      { display: flex; gap: 3px; margin-top: 5px; flex-wrap: wrap; }
+
+    .status-pip {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #cbd5e1;
+      flex-shrink: 0;
+      margin-top: 5px;
+    }
+
+    .status-pip.generating { background: #f59e0b; animation: pulse 1s infinite; }
+    .status-pip.ready      { background: #6366f1; }
+    .status-pip.form-open  { background: #3b82f6; animation: pulse 1s infinite; }
+    .status-pip.applied    { background: #10b981; }
+    .status-pip.skipped    { background: #94a3b8; }
+
+    /* ── Badges ─────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 6px;
+      border-radius: 9999px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .score-hi  { background: #dcfce7; color: #166534; }
+    .score-mid { background: #fef9c3; color: #854d0e; }
+    .score-lo  { background: #fee2e2; color: #991b1b; }
+    .remote    { background: #dbeafe; color: #1e40af; }
+    .onsite    { background: #f1f5f9; color: #475569; }
+    .st-ready  { background: #ede9fe; color: #5b21b6; }
+    .st-open   { background: #dbeafe; color: #1e40af; }
+    .st-applied{ background: #dcfce7; color: #166534; }
+    .st-skip   { background: #f1f5f9; color: #64748b; }
+    .st-gen    { background: #fef3c7; color: #92400e; }
+
+    /* ── Main panel ─────────────────────────────────────────── */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 32px;
+    }
+
+    /* Empty state */
+    .empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-muted);
+      text-align: center;
+      gap: 10px;
+    }
+
+    .empty .icon { font-size: 44px; }
+    .empty h2    { font-size: 17px; font-weight: 600; color: var(--text); }
+    .empty p     { font-size: 14px; max-width: 280px; line-height: 1.5; }
+
+    /* Detail */
+    .detail-title   { font-size: 22px; font-weight: 700; line-height: 1.3; }
+    .detail-company { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+    .detail-meta {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .detail-meta .badge { font-size: 11px; padding: 2px 8px; }
+
+    .ext-link {
+      font-size: 12px;
+      color: var(--accent);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .ext-link:hover { text-decoration: underline; }
+
+    /* Info box */
+    .info-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin: 20px 0;
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .info-box strong { color: var(--text); }
+
+    /* Section label */
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-label .hint {
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 11px;
+    }
+
+    /* Cover letter textarea */
+    #cover-letter {
+      width: 100%;
+      min-height: 380px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 13.5px;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--surface);
+      resize: vertical;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    #cover-letter:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+    }
+
+    #cover-letter:disabled {
+      background: var(--surface-2);
+      color: var(--text-muted);
+      cursor: default;
+    }
+
+    /* Alert banners */
+    .alert {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 16px 0;
+    }
+
+    .alert.info    { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .alert.success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .alert.warn    { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+
+    /* Actions row */
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { background: #047857; }
+
+    .btn-outline { background: transparent; border-color: var(--border); color: var(--text); }
+    .btn-outline:hover { background: var(--surface-2); }
+
+    .btn-ghost  { background: transparent; border-color: transparent; color: var(--text-muted); }
+    .btn-ghost:hover { color: var(--text); background: var(--surface-2); }
+
+    /* Spinner */
+    .spin {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spinning 0.65s linear infinite;
+    }
+
+    @keyframes spinning { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      color: #fff;
+      background: #1e293b;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar           { width: 5px; }
+    ::-webkit-scrollbar-track     { background: transparent; }
+    ::-webkit-scrollbar-thumb     { background: #cbd5e1; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Job Application Queue</h1>
+    <div class="subtitle" id="subtitle">Loading jobs…</div>
+  </div>
+  <div id="progress-track" class="progress-track"></div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-toolbar">
+      <input type="checkbox" id="check-all" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)">
+      <label for="check-all">All jobs</label>
+      <div class="spacer"></div>
+      <span class="sel-count" id="sel-count">0 selected</span>
+    </div>
+    <div id="jobs-list"></div>
+  </aside>
+
+  <main class="main" id="main">
+    <div class="empty">
+      <div class="icon">📋</div>
+      <h2>Select a job to begin</h2>
+      <p>Click any job in the list to view details and generate a tailored cover letter.</p>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let jobs = [];
+let states = {};   // index → { status, coverLetter }
+let active = null;
+let selected = new Set();
+
+const STATUS = { PENDING:'pending', GENERATING:'generating', READY:'ready',
+                 OPEN:'form-open', APPLIED:'applied', SKIPPED:'skipped' };
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const res = await fetch('/api/jobs');
+    if (!res.ok) throw new Error('Failed to load CSV');
+    jobs = await res.json();
+    jobs.forEach((_, i) => { states[i] = { status: STATUS.PENDING, coverLetter: '' }; });
+    renderList();
+    updateHeader();
+  } catch (e) {
+    document.getElementById('subtitle').textContent = '⚠ ' + e.message;
+  }
+}
+
+// ── Sidebar rendering ──────────────────────────────────────────────────────
+function renderList() {
+  document.getElementById('jobs-list').innerHTML =
+    jobs.map((job, i) => cardHTML(job, i)).join('');
+  updateSelCount();
+}
+
+function cardHTML(job, i) {
+  const score = +job['Match Score'] || 0;
+  const sc = score >= 8 ? 'score-hi' : score >= 6 ? 'score-mid' : 'score-lo';
+  const rm = job['Remote'] === 'Yes';
+  const st = states[i].status;
+  const cls = [
+    'job-card',
+    active === i ? 'active' : '',
+    st === STATUS.APPLIED ? 'applied' : '',
+    st === STATUS.SKIPPED ? 'skipped' : ''
+  ].filter(Boolean).join(' ');
+
+  return `<div class="${cls}" id="card-${i}" onclick="selectJob(${i})">
+    <input type="checkbox" ${selected.has(i) ? 'checked' : ''}
+      onclick="toggleSel(event,${i})" style="margin-top:2px;flex-shrink:0;width:14px;height:14px;cursor:pointer;accent-color:var(--accent)">
+    <div class="card-body">
+      <div class="card-title" title="${e(job['Job Title'])}">${e(job['Job Title'])}</div>
+      <div class="card-company">${e(job['Company'])}</div>
+      <div class="card-badges">
+        <span class="badge ${sc}">${score}/10</span>
+        <span class="badge ${rm ? 'remote' : 'onsite'}">${rm ? 'Remote' : 'On-site'}</span>
+        ${statusBadge(st)}
+      </div>
+    </div>
+    <div class="status-pip ${st}"></div>
+  </div>`;
+}
+
+function statusBadge(st) {
+  const map = {
+    [STATUS.GENERATING]: `<span class="badge st-gen">Generating…</span>`,
+    [STATUS.READY]:      `<span class="badge st-ready">Ready</span>`,
+    [STATUS.OPEN]:       `<span class="badge st-open">Form open</span>`,
+    [STATUS.APPLIED]:    `<span class="badge st-applied">Applied ✓</span>`,
+    [STATUS.SKIPPED]:    `<span class="badge st-skip">Skipped</span>`,
+  };
+  return map[st] || '';
+}
+
+function refreshCard(i) {
+  const el = document.getElementById(`card-${i}`);
+  if (el) el.outerHTML = cardHTML(jobs[i], i);
+}
+
+// ── Selection ──────────────────────────────────────────────────────────────
+function toggleSel(ev, i) {
+  ev.stopPropagation();
+  selected.has(i) ? selected.delete(i) : selected.add(i);
+  updateSelCount();
+  refreshCard(i);
+}
+
+function updateSelCount() {
+  document.getElementById('sel-count').textContent = `${selected.size} selected`;
+  const ca = document.getElementById('check-all');
+  ca.checked = selected.size === jobs.length && jobs.length > 0;
+  ca.indeterminate = selected.size > 0 && selected.size < jobs.length;
+}
+
+document.getElementById('check-all').addEventListener('change', function() {
+  jobs.forEach((_, i) => this.checked ? selected.add(i) : selected.delete(i));
+  renderList();
+  updateSelCount();
+});
+
+// ── Job activation ─────────────────────────────────────────────────────────
+function selectJob(i) {
+  const prev = active;
+  active = i;
+  if (prev !== null) refreshCard(prev);
+  refreshCard(i);
+  renderDetail(i);
+  updateHeader();
+}
+
+// ── Header / progress ──────────────────────────────────────────────────────
+function updateHeader() {
+  const applied = Object.values(states).filter(s => s.status === STATUS.APPLIED).length;
+  const skipped = Object.values(states).filter(s => s.status === STATUS.SKIPPED).length;
+  document.getElementById('subtitle').textContent =
+    `${jobs.length} matched · ${applied} applied · ${skipped} skipped`;
+
+  document.getElementById('progress-track').innerHTML =
+    jobs.map((job, i) => {
+      const s = states[i].status;
+      const cls = s === STATUS.APPLIED ? 'applied' : s === STATUS.SKIPPED ? 'skipped' : active === i ? 'active' : '';
+      return `<div class="progress-pip ${cls}" title="${e(job['Job Title'])}"></div>`;
+    }).join('');
+}
+
+// ── Detail panel ───────────────────────────────────────────────────────────
+function renderDetail(i) {
+  const job = jobs[i];
+  const st  = states[i];
+  const score = +job['Match Score'] || 0;
+  const sc = score >= 8 ? 'score-hi' : score >= 6 ? 'score-mid' : 'score-lo';
+  const rm = job['Remote'] === 'Yes';
+
+  document.getElementById('main').innerHTML = `
+    <div>
+      <div class="detail-title">${e(job['Job Title'])}</div>
+      <div class="detail-company">${e(job['Company'])}</div>
+      <div class="detail-meta">
+        <span class="badge ${sc}" style="font-size:11px;padding:2px 8px">${score}/10 match</span>
+        <span class="badge ${rm ? 'remote' : 'onsite'}" style="font-size:11px;padding:2px 8px">${rm ? 'Remote' : 'On-site'}</span>
+        ${job['Posted Date'] && job['Posted Date'] !== 'Unknown'
+          ? `<span class="badge onsite" style="font-size:11px;padding:2px 8px">${e(job['Posted Date'])}</span>` : ''}
+        <a href="${e(job['Link'])}" target="_blank" class="ext-link">View posting ↗</a>
+      </div>
+
+      <div class="info-box">
+        <strong>AI assessment:</strong> ${e(job['AI Reason'])}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:16px;align-items:start">
+        <div>
+          <div class="section-label">Job Description</div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;font-size:13px;line-height:1.75;white-space:pre-wrap;height:420px;overflow-y:auto;color:var(--text)">${job['Description'] ? e(job['Description']) : `<span style="color:var(--text-muted);font-style:italic">No description in CSV — re-run <code>npm start</code> to populate this field.</span>`}</div>
+        </div>
+        <div id="detail-body">${detailBody(i)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function detailBody(i) {
+  const st = states[i];
+
+  if (st.status === STATUS.PENDING) return `
+    <div class="section-label">Cover Letter</div>
+    <textarea id="cover-letter" disabled placeholder="Click 'Generate Cover Letter' to create a tailored cover letter with AI…"></textarea>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="generate(${i})">✨ Generate Cover Letter</button>
+    </div>`;
+
+  if (st.status === STATUS.GENERATING) return `
+    <div class="section-label">Cover Letter</div>
+    <textarea id="cover-letter" disabled placeholder="Generating with AI…"></textarea>
+    <div class="actions">
+      <button class="btn btn-primary" disabled><span class="spin"></span> Generating…</button>
+    </div>`;
+
+  if (st.status === STATUS.READY) return `
+    <div class="section-label">Cover Letter <span class="hint">— feel free to edit before applying</span></div>
+    <textarea id="cover-letter" oninput="saveCL(${i},this.value)">${e(st.coverLetter)}</textarea>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="openForm(${i})">🌐 Open Application Form</button>
+      <button class="btn btn-outline" onclick="regen(${i})">↺ Regenerate</button>
+      <button class="btn btn-ghost" onclick="skip(${i})">Skip →</button>
+    </div>`;
+
+  if (st.status === STATUS.OPEN) return `
+    <div class="section-label">Cover Letter <span class="hint">— you can still edit this</span></div>
+    <textarea id="cover-letter" oninput="saveCL(${i},this.value)">${e(st.coverLetter)}</textarea>
+    <div class="alert info">
+      🌐 Application form is open in the browser — fill in any remaining fields and submit when ready.
+    </div>
+    <div class="actions">
+      <button class="btn btn-success" onclick="markApplied(${i})">✅ Applied — Next Job</button>
+      <button class="btn btn-outline" onclick="skip(${i})">⏭ Skip this job</button>
+    </div>`;
+
+  if (st.status === STATUS.APPLIED) return `
+    <div class="section-label">Cover Letter</div>
+    <textarea id="cover-letter" disabled>${e(st.coverLetter)}</textarea>
+    <div class="alert success">✅ Application submitted for this job.</div>
+    <div class="actions">
+      <button class="btn btn-ghost" onclick="undo(${i})">↩ Undo</button>
+    </div>`;
+
+  if (st.status === STATUS.SKIPPED) return `
+    <div class="section-label">Cover Letter</div>
+    <textarea id="cover-letter" disabled>${e(st.coverLetter)}</textarea>
+    <div class="alert warn">⏭ You skipped this job.</div>
+    <div class="actions">
+      <button class="btn btn-ghost" onclick="undo(${i})">↩ Undo</button>
+    </div>`;
+
+  return '';
+}
+
+function refreshDetail() {
+  if (active === null) return;
+  const el = document.getElementById('detail-body');
+  if (el) el.innerHTML = detailBody(active);
+}
+
+// ── Cover letter actions ───────────────────────────────────────────────────
+async function generate(i) {
+  const job = jobs[i];
+  setStatus(i, STATUS.GENERATING);
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job: {
+        title:       job['Job Title'],
+        company:     job['Company'],
+        description: job['Description'] || job['AI Reason'],
+      }}),
+    });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+    const { coverLetter } = await res.json();
+    states[i].coverLetter = coverLetter;
+    setStatus(i, STATUS.READY);
+    toast('Cover letter generated ✓');
+  } catch (err) {
+    setStatus(i, STATUS.PENDING);
+    toast('Error: ' + err.message, true);
+  }
+}
+
+async function regen(i) {
+  states[i].status = STATUS.PENDING;
+  await generate(i);
+}
+
+function saveCL(i, text) {
+  states[i].coverLetter = text;
+}
+
+// ── Form actions ───────────────────────────────────────────────────────────
+async function openForm(i) {
+  const job = jobs[i];
+  setStatus(i, STATUS.OPEN);
+  try {
+    const res = await fetch('/api/open-form', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        job: { title: job['Job Title'], company: job['Company'],
+               description: job['Description'] || job['AI Reason'], link: job['Link'] },
+        coverLetter: states[i].coverLetter,
+      }),
+    });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+    toast('Browser opened — form is being filled');
+  } catch (err) {
+    setStatus(i, STATUS.READY);
+    toast('Error: ' + err.message, true);
+  }
+}
+
+async function markApplied(i) {
+  await closeForm();
+  setStatus(i, STATUS.APPLIED);
+  toast('Marked as applied ✓');
+  advance(i);
+}
+
+async function skip(i) {
+  await closeForm();
+  setStatus(i, STATUS.SKIPPED);
+  advance(i);
+}
+
+function undo(i) {
+  states[i].status = STATUS.PENDING;
+  if (!states[i].coverLetter) {
+    setStatus(i, STATUS.PENDING);
+  } else {
+    setStatus(i, STATUS.READY);
+  }
+}
+
+async function closeForm() {
+  try { await fetch('/api/close-form', { method: 'POST' }); } catch {}
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function setStatus(i, status) {
+  states[i].status = status;
+  refreshCard(i);
+  if (active === i) refreshDetail();
+  updateHeader();
+}
+
+function advance(from) {
+  // Auto-advance to the next selected pending/ready job
+  const next = [...selected]
+    .sort((a, b) => a - b)
+    .find(i => i > from && [STATUS.PENDING, STATUS.READY].includes(states[i].status));
+  if (next !== undefined) setTimeout(() => selectJob(next), 350);
+}
+
+function e(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+let toastTimer;
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.background = isError ? '#be123c' : '#1e293b';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Start ──────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
