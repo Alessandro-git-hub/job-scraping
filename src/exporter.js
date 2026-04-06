@@ -29,15 +29,17 @@ export async function exportCSV(matches) {
       { id: "isRemote",   title: "Remote"       },
       { id: "postedDate", title: "Posted Date"  },
       { id: "link",       title: "Link"         },
-      { id: "score",      title: "Match Score"  },
-      { id: "reason",     title: "AI Reason"    },
+      { id: "score",       title: "Match Score"   },
+      { id: "reason",      title: "AI Reason"     },
+      { id: "description", title: "Description"   },
     ],
   });
 
   const records = matches.map((job) => ({
     ...job,
-    isRemote:   job.isRemote ? "Yes" : "No",
-    postedDate: job.postedAt ? job.postedAt.toISOString().slice(0, 10) : "Unknown",
+    isRemote:    job.isRemote ? "Yes" : "No",
+    postedDate:  job.postedAt ? job.postedAt.toISOString().slice(0, 10) : "Unknown",
+    description: job.description || "",
   }));
 
   await writer.writeRecords(records);

@@ -9,6 +9,7 @@ import { loadCV }                              from "./src/cv.js";
 import { loadJobHistory, saveJobHistory }      from "./src/history.js";
 import { fetchJobs }                           from "./src/fetcher.js";
 import { evaluateJob }                         from "./src/evaluator.js";
+import { enrichDescriptions }                  from "./src/enricher.js";
 import { exportCSV }                           from "./src/exporter.js";
 
 // ─────────────────────────────────────────────────────────────
@@ -84,6 +85,7 @@ async function main() {
           isRemote: job.isRemote || false,
           postedAt: job.postedAt || null,
           link: job.link,
+          description: job.description || "",
           score: result.score,
           reason: result.reason,
         });
@@ -95,7 +97,10 @@ async function main() {
     saveJobHistory(seenLinks);
   }
 
-  // Step 5 — Export results
+  // Step 5 — Enrich descriptions for matched jobs
+  await enrichDescriptions(matches);
+
+  // Step 6 — Export results
   if (matches.length === 0) {
     console.log("\n😕  No matching jobs found. Try broadening your CV or search query.");
     return;
