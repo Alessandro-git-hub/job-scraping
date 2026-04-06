@@ -5,12 +5,25 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "apply": "node apply.js",
+    "enrich": "node enrich.js",
+    "ui": "node server.js"
   },
-  "keywords": ["job-scraping", "ai", "openai", "csv", "automation"],
+  "keywords": [
+    "job-scraping",
+    "ai",
+    "openai",
+    "csv",
+    "automation"
+  ],
   "license": "MIT",
   "dependencies": {
+    "csv-parse": "^6.2.1",
     "csv-writer": "^1.6.0",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "express": "^4.22.1",
+    "inquirer": "^9.3.7",
+    "playwright": "^1.44.0"
   }
 }
