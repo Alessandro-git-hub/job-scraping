@@ -1,6 +1,6 @@
 # Job-Scraping Pipeline
 
-An automated, zero-UI job-hunting pipeline. It reads your CV, fetches job listings from multiple sources, evaluates each one with a local AI model, and exports the best matches to a CSV file.
+An automated job-hunting pipeline with a web UI. It reads your CV, fetches job listings from multiple sources, evaluates each one with a local AI model, exports the best matches to a CSV file, and lets you review, enrich, generate cover letters, and apply — all from a browser dashboard.
 
 ---
 
@@ -23,13 +23,24 @@ CV + .env config
                                         │
                                         ▼
                                Export matched_jobs.csv
+                                        │
+                                        ▼
+                            ┌─── Web UI (localhost:3000) ───┐
+                            │  Review & filter matches      │
+                            │  Enrich job descriptions      │
+                            │  Generate cover letters (AI)  │
+                            │  One-click apply (Playwright) │
+                            └───────────────────────────────┘
 ```
 
-1. **Fetch** — Pulls listings from Google Jobs (via SerpApi), RemoteOK, and Adzuna across all configured queries and locations.
+1. **Fetch** — Pulls listings from Google Jobs (via SerpApi), RemoteOK, Adzuna, Arbeitnow, Himalayas, Remotive, WeWorkRemotely, Jobicy, remote-es, Manfred, and Tecnoempleo across all configured queries and locations.
 2. **Deduplicate & Filter** — Removes already-seen jobs (persisted in `job_history.json`), jobs older than the age limit, and jobs matching excluded keywords.
 3. **AI Evaluation** — Each remaining job is sent to a local [Ollama](https://ollama.com/) model together with your CV. The model returns a fit score (1–10), a match decision, a one-sentence reason, and the years of experience explicitly required in the description.
 4. **Experience Gate** — If `MAX_YEARS_EXPERIENCE` is set, any job requiring more years than the limit is discarded before the match check.
 5. **Export** — Surviving matches are appended to `matched_jobs.csv`.
+6. **Enrich** — Optionally fetch full job descriptions for listings that only have a summary (`npm run enrich`).
+7. **Web UI** — Browse, filter, and act on matches from a browser dashboard at `localhost:3000`. Generate AI cover letters, open job pages, and trigger Playwright-based auto-apply — all from the UI.
+8. **Apply** — One-click or interactive application flow using Playwright to open job pages and auto-fill forms with your profile data.
 
 ---
 
@@ -38,9 +49,10 @@ CV + .env config
 | Dependency | Purpose |
 |---|---|
 | [Node.js](https://nodejs.org/) ≥ 18 | Runtime (`fetch` built-in) |
-| [Ollama](https://ollama.com/) | Local AI inference |
+| [Ollama](https://ollama.com/) | Local AI inference + cover letter generation |
 | [SerpApi](https://serpapi.com/) key | Google Jobs / search engines |
 | Adzuna keys *(optional)* | Additional job source |
+| [Playwright](https://playwright.dev/) *(auto-installed)* | Browser automation for auto-apply |
 
 ---
 
@@ -77,13 +89,37 @@ See the [Environment Variables](#environment-variables) section for all options.
 
 Paste your CV as plain text into `cv.txt` at the project root.
 
-### 5. Run
+### 5. Run the pipeline
 
 ```bash
 npm start
 ```
 
 Matches are written to `matched_jobs.csv`.
+
+### 6. Launch the Web UI
+
+```bash
+npm run ui
+```
+
+Open [http://localhost:3000](http://localhost:3000) to browse matches, generate cover letters, and apply.
+
+### 7. Enrich descriptions (optional)
+
+```bash
+npm run enrich
+```
+
+Fetches full job descriptions for listings that only have a summary.
+
+### 8. Interactive apply (CLI, optional)
+
+```bash
+npm run apply
+```
+
+Walks through matched jobs one by one in the terminal with Playwright-powered auto-apply.
 
 ---
 
@@ -108,7 +144,7 @@ Matches are written to `matched_jobs.csv`.
 
 | Variable | Default | Description |
 |---|---|---|
-| `JOB_SOURCES` | `google_jobs,remoteok` | Comma-separated list of sources. **Free (no key):** `google_jobs`, `remoteok`, `arbeitnow`, `jobicy`, `himalayas`, `remotive`, `weworkremotely`. **Paid SerpApi:** `adzuna`, `linkedin_jobs`, `indeed_jobs`, `glassdoor` |
+| `JOB_SOURCES` | `google_jobs,remoteok` | Comma-separated list of sources. **Free (no key):** `google_jobs`, `remoteok`, `arbeitnow`, `jobicy`, `himalayas`, `remotive`, `weworkremotely`, `remotees`, `manfred`, `tecnoempleo`. **Paid SerpApi:** `adzuna`, `linkedin_jobs`, `indeed_jobs`, `glassdoor` |
 
 ### Search Parameters
 
@@ -155,27 +191,40 @@ Stores URLs of all previously fetched jobs so they are not re-evaluated on subse
 ```
 job-scraping/
 ├── index.js                  # Entry point / pipeline orchestration
+├── server.js                 # Web UI server (Express)
+├── apply.js                  # Interactive CLI apply flow
+├── enrich.js                 # Standalone description enricher
 ├── cv.txt                    # Your CV (plain text)
+├── profile.json              # Your profile data (for auto-apply)
 ├── matched_jobs.csv          # Output — matched job listings
 ├── job_history.json          # Seen-jobs cache
 ├── package.json
 ├── .env                      # Environment variables
+├── public/
+│   └── index.html            # Web UI frontend
 └── src/
     ├── config.js             # Constants and env validation
     ├── cv.js                 # CV loader
+    ├── coverLetter.js        # AI cover letter generation (Ollama)
     ├── dateParser.js         # Posted-date normalisation
+    ├── enricher.js           # Job description enrichment
     ├── evaluator.js          # Ollama AI evaluation
     ├── exporter.js           # CSV export
     ├── fetcher.js            # Orchestration, dedup, and filtering
+    ├── formFiller.js         # Playwright form auto-fill logic
+    ├── applier.js            # Playwright-based job application
     ├── history.js            # Job history persistence
     └── fetchers/
         ├── adzuna.js         # Adzuna API client (EU jobs, requires API key)
         ├── arbeitnow.js      # Arbeitnow client (European jobs, free)
         ├── himalayas.js      # Himalayas client (remote jobs, free)
         ├── jobicy.js         # Jobicy client (remote jobs, free)
+        ├── manfred.js        # Manfred client (Spanish tech jobs, free)
+        ├── remotees.js       # remote-es client (Spanish remote company boards, free)
         ├── remoteok.js       # RemoteOK API client (remote jobs, free)
         ├── remotive.js       # Remotive API client (remote software-dev jobs, free)
         ├── serpapi.js        # SerpApi client (Google Jobs, LinkedIn, etc.)
+        ├── tecnoempleo.js    # Tecnoempleo client (Spanish tech jobs, free)
         └── weworkremotely.js # We Work Remotely RSS feed (remote programming jobs, free)
 ```
 
@@ -190,6 +239,8 @@ job-scraping/
 - **`jobicy` and `himalayas`** are global remote-only boards with good English-language listings. No API key needed.
 - **`remotive`** covers the `software-dev` category with curated remote roles. No API key needed.
 - **`weworkremotely`** is one of the oldest and most trusted remote programming job boards. Fetched via RSS, no API key needed.
+- **`remotees`** crawls company career pages listed on remote-es.com — great for finding Spanish remote positions not posted on mainstream boards.
+- **`manfred`** and **`tecnoempleo`** are Spanish tech job boards. Good for Spain-based roles, no API key needed.
 - **For LinkedIn jobs** use the existing `linkedin_jobs` SerpApi engine (paid plan required) rather than unofficial scrapers.
 - **Ollama model size vs. speed** — `llama3.2` (3 B) is fast; `llama3.1` (8 B) or `mistral` offer better accuracy at the cost of slower inference.
 - **Re-running** is safe — seen jobs are skipped automatically via `job_history.json`.
